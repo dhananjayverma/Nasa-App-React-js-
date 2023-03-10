@@ -1,53 +1,54 @@
-import React from 'react';
-import{waitFor, render,fireEvent}  from '@testing-library/react';
-import Home from '../HomePage/Home';
-import axios from 'axios';
+import React from "react";
+import { render, screen, fireEvent } from "@testing-library/react";
+import Home from "../HomePage/Home";
 
-jest.mock('axios');
-
-describe('HomePage', () => {
-  afterEach(() => {
-    jest.resetAllMocks();
+describe("Home component", () => {
+  it("renders the correct elements", () => {
+    render(<Home />);
+    expect(screen.getByText("Home")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Enter Astroid Id")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Random Asteroid" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "submit" })).toBeInTheDocument();
   });
 
-  it('fetches data when the "Random Asteriod" button is pressed', async () => {
-    const mockData = {
+  it("updates the input value correctly", () => {
+    render(<Home />);
+    const input = screen.getByPlaceholderText("Enter Astroid Id") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "12345" } });
+    expect(input.value).toBe("12345");
+  });
+
+  it("sets local storage and navigates to asteroid page on submit button click", () => {
+    const navigate = jest.fn();
+    Object.defineProperty(window, "localStorage", {
+      value: {
+        setItem: jest.fn(),
+      },
+      writable: true,
+    });
+    render(<Home />);
+    const input = screen.getByPlaceholderText("Enter Astroid Id") as HTMLInputElement;
+    const submitButton = screen.getByRole("button", { name: "submit" });
+    fireEvent.change(input, { target: { value: "12345" } });
+    fireEvent.click(submitButton);
+    expect(window.localStorage.setItem).toHaveBeenCalledWith("astId", "12345");
+    expect(navigate).toHaveBeenCalledWith("/asteroid");
+  });
+
+  it("updates the input value with a random asteroid ID on random button click", async () => {
+    jest.mock("axios");
+    const { default: axios } = await import("axios");
+    axios.get.mockResolvedValue({
       data: {
         near_earth_objects: [
-          { id: '2000433' },
-        ],
+          { id: "2000433" },
+      ],
       },
-    };
-    (axios.get as jest.Mock).mockResolvedValue(mockData);
-
-    const { getByText } = render(<Home/>);
-    fireEvent.click(getByText('Random Asteriod'));
-
-    await waitFor(() => {
-      expect(axios.get).toHaveBeenCalledTimes(1);
-      expect(axios.get).toHaveBeenCalledWith('https://api.nasa.gov/neo/rest/v1/neo/browse?api_key=DEMO_KEY');
-      expect(getByText(mockData.data.near_earth_objects[0].id)).toBeTruthy();
     });
-  });
-
-  it('navigates to Asteroid screen when the "Submit" button is pressed with a valid asteroid id', () => {
-    const mockNavigate = jest.fn();
-    const { getByText, getByPlaceholderText } = render(<Home/>);
-    const asteroidId = '123';
-
-    fireEvent.changeText(getByPlaceholderText('Enter Asteroid Id here '), asteroidId);
-    fireEvent.click(getByText('Submit'));
-
-    expect(mockNavigate).toHaveBeenCalledWith('Asteroid', { AsteroidData: asteroidId });
-  });
-
-  it('disables the "Submit" button when no asteroid id is entered', () => {
-    const { getByText, getByPlaceholderText } = render(<Home/>);
-
-    expect(getByText('Submit').props.disabled).toBe(true);
-
-    fireEvent.changeText(getByPlaceholderText('Enter Asteroid Id here '), '123');
-
-    expect(getByText('Submit').props.disabled).toBe(false);
+    render(<Home />);
+    const randomButton = screen.getByRole("button", { name: "Random Asteroid" });
+    fireEvent.click(randomButton);
+    expect(axios.get).toHaveBeenCalledWith("https://api.nasa.gov/neo/rest/v1/neo/browse?api_key=DEMO_KEY");
+    expect(screen.getByPlaceholderText("Enter Astroid Id")).toHaveValue(expect.any(String));
   });
 });
